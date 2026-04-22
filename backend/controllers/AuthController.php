@@ -39,6 +39,7 @@ class AuthController
 
     private function index(): void
     {
+        $this->requireRole('admin');
         send_json(UserModel::all());
     }
 
@@ -75,6 +76,10 @@ class AuthController
         $email = strtolower(trim((string) ($data['email'] ?? '')));
         $password = (string) ($data['password'] ?? '');
         $role = 'customer';
+
+        if (($data['role'] ?? null) !== null) {
+            send_json(['message' => 'Không thể tự chọn quyền tài khoản khi đăng ký.'], 403);
+        }
 
         if ($name === '' || $email === '' || $password === '') {
             send_json(['message' => 'Vui lòng nhập đầy đủ họ tên, email và mật khẩu.'], 400);
@@ -142,6 +147,26 @@ class AuthController
         $user = $statement->fetch();
 
         return $user ?: null;
+    }
+
+    private function requireAuth(): array
+    {
+        $user = $this->sessionUser();
+        if (!$user) {
+            send_json(['message' => 'Bạn cần đăng nhập để sử dụng chức năng này.'], 401);
+        }
+
+        return $user;
+    }
+
+    private function requireRole(string $requiredRole): array
+    {
+        $user = $this->requireAuth();
+        if ((string) ($user['role'] ?? '') !== $requiredRole) {
+            send_json(['message' => 'Bạn không có quyền truy cập chức năng này.'], 403);
+        }
+
+        return $user;
     }
 
     private function passwordIsValid(string $password, string $storedPassword): bool

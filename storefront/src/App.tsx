@@ -6,6 +6,7 @@ import { AdminPage } from './pages/AdminPage'
 import { AuthPage } from './pages/AuthPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
+import { CustomerPage } from './pages/CustomerPage'
 import { HomePage } from './pages/HomePage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import {
@@ -17,8 +18,8 @@ import {
 } from './services/authApi'
 import { fetchProducts } from './services/productsApi'
 import type { AuthResult, CartItem, Product, User } from './types'
-import { normalizeUser, roleLabels } from './utils/auth'
-import { readSessionStorage, readStorage } from './utils/storage'
+import { roleLabels } from './utils/auth'
+import { readStorage } from './utils/storage'
 
 function App() {
   const [selectedCategory, setSelectedCategory] = useState('Tất cả')
@@ -26,33 +27,61 @@ function App() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>(() => readStorage<CartItem[]>('cart', []))
   const [accounts, setAccounts] = useState<User[]>([])
-  const [user, setUser] = useState<User | null>(() =>
-    normalizeUser(readSessionStorage<User | null>('user', null)),
-  )
+  const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart))
   }, [cart])
 
   useEffect(() => {
-    if (user) {
-      sessionStorage.setItem('user', JSON.stringify(user))
-    } else {
-      sessionStorage.removeItem('user')
+    if (user?.role !== 'admin') {
+      setAccounts([])
+      return
     }
-    localStorage.removeItem('user')
-  }, [user])
 
-  useEffect(() => {
     fetchUsers()
       .then(setAccounts)
-      .catch(() => undefined)
-  }, [])
+      .catch(() => setAccounts([]))
+  }, [user?.role])
 
   useEffect(() => {
-    fetchCurrentUser()
-      .then((currentUser) => setUser(currentUser))
-      .catch(() => setUser(null))
+    let cancelled = false
+    const tabSessionKey = 'novatech_tab_session'
+
+    const bootstrapAuth = async () => {
+      const isExistingTabSession = sessionStorage.getItem(tabSessionKey) === '1'
+      sessionStorage.setItem(tabSessionKey, '1')
+
+      if (!isExistingTabSession) {
+        try {
+          await logoutWithApi()
+        } catch {
+          // ignore errors when there is no server session to clear
+        }
+
+        if (!cancelled) {
+          setUser(null)
+        }
+        return
+      }
+
+      try {
+        const currentUser = await fetchCurrentUser()
+        if (!cancelled) {
+          setUser(currentUser)
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null)
+        }
+      }
+    }
+
+    bootstrapAuth()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -276,6 +305,20 @@ function App() {
               onLogout={logoutUser}
               onRegister={registerUser}
             />
+          }
+        />
+        <Route
+          path="/customer"
+          element={
+            user?.role === 'customer' ? (
+              <CustomerPage user={user} />
+            ) : (
+              <Navigate
+                replace
+                to="/auth"
+                state={{ redirectReason: 'Bạn cần đăng nhập tài khoản khách hàng để vào trang này.' }}
+              />
+            )
           }
         />
         <Route

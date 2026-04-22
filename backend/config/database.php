@@ -15,6 +15,7 @@ function cors_origin(): string
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_set_cookie_params([
+        'lifetime' => 0,
         'httponly' => true,
         'path' => '/',
         'samesite' => 'Lax',

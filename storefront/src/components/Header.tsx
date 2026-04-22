@@ -22,6 +22,7 @@ export function Header({ user, cartCount, cartTarget, cartState }: HeaderProps) 
 
       <nav className="nav">
         <NavLink to="/">Sản phẩm</NavLink>
+        {user?.role === 'customer' ? <NavLink to="/customer">Khách hàng</NavLink> : null}
         {user ? (
           <NavLink to="/cart">Giỏ hàng</NavLink>
         ) : (
